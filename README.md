@@ -9,6 +9,7 @@ uv run suspension --port 8100 --no-browser
 
 - `src/suspension/physics.py`: quarter-car (body + wheel, spring, asymmetric damper, tire that can lift off)
 - `src/suspension/half.py`: half-car side view with pitch, wheelbase delay, braking/accelerating
+- skyhook semi-active damper (`damper_force` in `physics.py`): the "Controller" sliders; dashed curves show the passive baseline
 - `src/suspension/road.py`: road profiles (curb, bump, pothole, waves, rough road)
 - `src/suspension/server.py`: FastAPI, `POST /api/simulate`
 - `src/suspension/static/`: web page (canvas animation, Plotly plots)

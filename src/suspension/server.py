@@ -1,5 +1,6 @@
 """FastAPI app: one endpoint that runs the physics, plus the static web page."""
 
+from dataclasses import replace
 from pathlib import Path
 from typing import Literal
 
@@ -25,6 +26,8 @@ class CarIn(BaseModel):
     damping_rebound: float = Field(3_000.0, ge=0)
     tire_rate: float = Field(200_000.0, gt=0)
     progression: float = Field(0.0, ge=0)
+    skyhook_gain: float = Field(0.0, ge=0)
+    damping_max: float = Field(6_000.0, gt=0)
 
 
 class RoadIn(BaseModel):
@@ -67,6 +70,7 @@ def api_simulate(req: SimulateRequest) -> dict:
     car = Car(**req.car.model_dump())
     road = Road(**req.road.model_dump())
     freq = np.logspace(np.log10(0.2), np.log10(40), 400)
+    passive = replace(car, skyhook_gain=0.0)  # same car with the controller switched off
     if req.model == "half":
         half = HalfCar(car=car, **req.half.model_dump())
         result = {
@@ -74,12 +78,20 @@ def api_simulate(req: SimulateRequest) -> dict:
             "time": simulate_half(half, road),
             "frequency": frequency_response_half(half, freq, road.speed),
         }
+        baseline = lambda: simulate_half(replace(half, car=passive), road)  # noqa: E731
     else:
         result = {
             "characteristics": characteristics(car),
             "time": simulate(car, road),
             "frequency": frequency_response(car, freq),
         }
+        baseline = lambda: simulate(passive, road)  # noqa: E731
+    if car.skyhook_gain > 0:
+        # Passive comparison: same springs and dampers settings, no controller.
+        base = baseline()
+        result["baseline"] = {k: base[k] for k in ("z_body", "body_acc", "metrics")}
+        if req.model == "half":
+            result["baseline"]["pitch_deg"] = base["pitch_deg"]
     return _jsonable({"model": req.model, **result, "input_frequency": road.input_frequency})
 
 

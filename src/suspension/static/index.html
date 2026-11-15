@@ -24,6 +24,12 @@
         <div id="road-kind" class="segmented"></div>
         <div id="road-sliders"></div>
       </section>
+      <section>
+        <h2>Controller (semi-active)</h2>
+        <div id="control-sliders"></div>
+        <p class="note">Skyhook: the damper adds force against the body's own motion, as if the body hung from
+          a hook in the sky. Dashed curves show the same car with a normal damper.</p>
+      </section>
       <section id="half-section" hidden>
         <h2>Car shape and driving</h2>
         <div id="half-sliders"></div>
@@ -101,6 +107,8 @@
         <h3>Frequency response</h3>
         <p class="note">How much of a road wave of each frequency reaches the body and the wheel.
           Above 1 it is amplified, below 1 it is filtered out. Dashed lines: half and double damping.
+          <span id="freq-skyhook-note" hidden>With the skyhook controller on, this plot still shows the
+            passive damper: the controller changes the damper while it moves, so there is no single curve.</span>
           <span id="freq-half-note" hidden>Half-car: the rear wheel meets each wave later (wheelbase ÷ speed).
             When that delay is half a wave, the front and rear are pushed in opposite directions and the car pitches most:
             the nose and tail curves then differ.</span></p>
@@ -149,6 +157,18 @@
             <h4>Unsprung mass</h4>
             <p>A heavy wheel has more inertia: it follows bumps less well and loses grip sooner.
               That's why light wheels and inboard brakes help handling.</p>
+          </div>
+          <div>
+            <h4>Suspension as a controller</h4>
+            <p>The spring is the <b>P</b> term (force ∝ position error) and the damper the <b>D</b> term
+              (force ∝ speed): a passive suspension is a PD controller. There is no <b>I</b> term, which is why the
+              car sags under load; self-levelling air suspension adds it.</p>
+          </div>
+          <div>
+            <h4>Skyhook (semi-active)</h4>
+            <p>A passive damper can't tell body motion from wheel motion, so a stiff one passes road noise up.
+              Skyhook measures the body's own velocity and stiffens the damper only when that pushes the body
+              toward rest. The damper can still only resist (never drive) the motion, which is why it is "semi" active.</p>
           </div>
           <div>
             <h4>Pitch: dive and squat</h4>

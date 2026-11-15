@@ -32,6 +32,13 @@ class Car:
     damping_rebound: float = 3_000.0  # N*s/m, damper extending
     tire_rate: float = 200_000.0  # N/m
     progression: float = 0.0  # extra stiffness at REF_TRAVEL: 1.0 = twice as stiff
+    skyhook_gain: float = 0.0  # N*s/m, 0 = ordinary passive damper
+    damping_max: float = 6_000.0  # N*s/m, hardest the semi-active damper can get
+
+    @property
+    def damping_min(self) -> float:
+        """Softest the semi-active damper gets: the lower of the two passive settings."""
+        return min(self.damping_compression, self.damping_rebound)
 
     @property
     def static_tire_load(self) -> float:
@@ -48,9 +55,26 @@ def spring_force(car: Car, travel):
     return car.spring_rate * travel * (1 + car.progression * (travel / REF_TRAVEL) ** 2)
 
 
-def damper_force(car: Car, travel_rate):
-    """Damper resists motion, with different rates for compression and rebound."""
+def damper_force(car: Car, travel_rate, body_velocity=0.0):
+    """Force of the damper on the body (+ = up).
+
+    Passive: F = c * v, with different c for compression and rebound.
+
+    Semi-active "skyhook" (skyhook_gain > 0): the ideal is a damper hooked to the sky that
+    pushes against the body's ABSOLUTE velocity, F = -gain * v_body. A real damper can only
+    resist the RELATIVE motion between body and wheel, so it can do this only when the two
+    point the same way (v_body and travel_rate have opposite signs: body rising while the
+    damper extends). Then the controller stiffens the damper to c = gain * |v_body| / |v_rel|,
+    limited to [damping_min, damping_max]. Otherwise it goes as soft as it can.
+    """
     c = np.where(travel_rate > 0, car.damping_compression, car.damping_rebound)
+    if car.skyhook_gain > 0:
+        wanted = car.skyhook_gain * np.abs(body_velocity) / np.maximum(np.abs(travel_rate), 1e-3)
+        c = np.where(
+            body_velocity * travel_rate < 0,
+            np.clip(wanted, car.damping_min, car.damping_max),
+            car.damping_min,
+        )
     return c * travel_rate
 
 
@@ -90,7 +114,7 @@ def simulate(car: Car, road: Road, sample_rate: float = 200.0) -> dict:
 
     def derivatives(t, y):
         z_body, v_body, z_wheel, v_wheel = y
-        f_susp = spring_force(car, z_wheel - z_body) + damper_force(car, v_wheel - v_body)
+        f_susp = spring_force(car, z_wheel - z_body) + damper_force(car, v_wheel - v_body, v_body)
         f_tire = tire_force(car, road_at(t) - z_wheel)
         return [v_body, f_susp / car.body_mass, v_wheel, (f_tire - f_susp) / car.wheel_mass]
 
@@ -102,7 +126,7 @@ def simulate(car: Car, road: Road, sample_rate: float = 200.0) -> dict:
     z_road = road_at(t)
     travel = z_wheel - z_body
     travel_rate = v_wheel - v_body
-    f_susp = spring_force(car, travel) + damper_force(car, travel_rate)
+    f_susp = spring_force(car, travel) + damper_force(car, travel_rate, v_body)
     f_tire = tire_force(car, z_road - z_wheel)
     body_acc = f_susp / car.body_mass
     tire_load_pct = 100 * (car.static_tire_load + f_tire) / car.static_tire_load

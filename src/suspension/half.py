@@ -33,6 +33,8 @@ def scaled(car: Car, w: float) -> Car:
         damping_compression=car.damping_compression * w,
         damping_rebound=car.damping_rebound * w,
         tire_rate=car.tire_rate * w,
+        skyhook_gain=car.skyhook_gain * w,
+        damping_max=car.damping_max * w,
     )
 
 
@@ -135,8 +137,9 @@ def simulate_half(half: HalfCar, road: Road, sample_rate: float = 200.0) -> dict
         z, vz, th, vth, zf, vf, zr, vr = y
         tf, tr = zf - (z + a * th), zr - (z - b * th)  # travel, + = compressed
         vtf, vtr = vf - (vz + a * vth), vr - (vz - b * vth)
-        Ff = spring_force(front, tf) + damper_force(front, vtf)  # force on body, + = up
-        Fr = spring_force(rear, tr) + damper_force(rear, vtr)
+        # force on body, + = up; the skyhook damper needs the body's own velocity at each mount
+        Ff = spring_force(front, tf) + damper_force(front, vtf, vz + a * vth)
+        Fr = spring_force(rear, tr) + damper_force(rear, vtr, vz - b * vth)
         Tf = tire_force(front, road_front(t) - zf)
         Tr = tire_force(rear, road_rear(t) - zr)
         return Ff, Fr, Tf, Tr, tf, tr

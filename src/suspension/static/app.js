@@ -26,6 +26,10 @@ const SLIDERS = [
     hint: "Force per m/s while the wheel moves up into the car." },
   { group: "damper", key: "damping_rebound", label: "Rebound damping", min: 0.1, max: 8, step: 0.1, value: 3.0, unit: "kN·s/m", si: 1000,
     hint: "Force per m/s while extending. Usually higher than compression." },
+  { group: "control", key: "skyhook_gain", label: "Skyhook gain", min: 0, max: 20, step: 0.5, value: 0, unit: "kN·s/m", si: 1000,
+    hint: "0 = ordinary damper. Above 0 the damper is soft, then stiffens only when that calms the body." },
+  { group: "control", key: "damping_max", label: "Hardest damper setting", min: 2, max: 12, step: 0.5, value: 6, unit: "kN·s/m", si: 1000,
+    hint: "The controller can't go harder than this. Softest = the lower of your two damping settings above." },
   // half-car only
   { group: "half", key: "braking_g", label: "Braking (+) / accelerating (−)", min: -0.5, max: 1, step: 0.05, value: 0, unit: "g", si: 1,
     hint: "Pedal pressed from 0.5 s to 2.5 s. Braking tips the nose down (dive), accelerating the tail down (squat)." },
@@ -234,7 +238,10 @@ function renderReadouts() {
   const grip = m.airborne_pct > 0 ? "bad" : m.tire_load_min_pct > 40 ? "good" : "";
   const zeta = ["Damping ratio ζ", `${c.zeta_compression.toFixed(2)} / ${c.zeta_rebound.toFixed(2)}`,
     `comp / reb · critical ${(c.critical_damping / 1000).toFixed(1)} kN·s/m`];
-  const comfort = ["Comfort", `${m.body_acc_rms.toFixed(2)} m/s²`, `RMS body accel · peak ${m.body_acc_peak.toFixed(1)}`];
+  const b = sim.baseline;
+  const comfort = ["Comfort", `${m.body_acc_rms.toFixed(2)} m/s²`,
+    b ? `RMS body accel · passive ${b.metrics.body_acc_rms.toFixed(2)}` : `RMS body accel · peak ${m.body_acc_peak.toFixed(1)}`,
+    b ? (m.body_acc_rms < b.metrics.body_acc_rms ? "good" : "bad") : ""];
   const gripCard = ["Grip", `${m.tire_load_min_pct.toFixed(0)} %`,
     m.airborne_pct > 0 ? `min tire load · airborne ${m.airborne_pct.toFixed(1)} % of time` : "minimum tire load", grip];
   const sag = ["Static sag", `${cm(c.static_sag)} cm`, "spring compression at rest"];
@@ -293,8 +300,12 @@ function renderPlots() {
   const T = sim.time;
   const half = sim.model === "half";
   const scale = (a) => a.map((v) => v * 100);
+  const base = sim.baseline; // passive comparison, only when the skyhook controller is on
+  const dashed = (y, name, color = css("--body")) =>
+    ({ x: T.t, y, name, line: line(color, 1.5, "dash") });
   $("card-pitch").hidden = !half;
   $("freq-half-note").hidden = !half;
+  $("freq-skyhook-note").hidden = !base;
 
   // Motion
   const motion = half
@@ -309,6 +320,7 @@ function renderPlots() {
         { x: T.t, y: scale(T.z_wheel), name: "Wheel", line: line(css("--wheel"), 2) },
         { x: T.t, y: scale(T.z_body), name: "Body", line: line(css("--body"), 2.5) },
       ];
+  if (base) motion.push(dashed(scale(base.z_body), "Body, passive damper"));
   Plotly.react("plot-motion", motion, layout({
     xaxis: timeAxes.xaxis(),
     yaxis: axis({ title: { text: "height (cm)" } }),
@@ -319,9 +331,10 @@ function renderPlots() {
   if (half) {
     Plotly.react("plot-pitch", [
       { x: T.t, y: T.pitch_deg, name: "Pitch", line: line(css("--body"), 2.5) },
+      ...(base ? [dashed(base.pitch_deg, "Pitch, passive damper")] : []),
     ], layout({
       margin: { l: 55, r: 20, t: 10, b: 40 },
-      showlegend: false,
+      showlegend: Boolean(base),
       xaxis: timeAxes.xaxis(),
       yaxis: axis({ title: { text: "pitch (° nose up)" } }),
       shapes: [cursor(simT)],
@@ -337,6 +350,7 @@ function renderPlots() {
     : [{ x: T.t, y: T.tire_load_pct, name: "Tire load", yaxis: "y2", line: line(css("--wheel"), 2) }];
   Plotly.react("plot-feel", [
     { x: T.t, y: T.body_acc, name: "Body acceleration", line: line(css("--body"), 2) },
+    ...(base ? [dashed(base.body_acc, "Body accel, passive damper")] : []),
     ...load,
   ], layout({
     xaxis: timeAxes.xaxis(),
