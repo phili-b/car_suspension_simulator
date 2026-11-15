@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Suspension Explorer</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="plotly.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Suspension Explorer</h1>
+    <p>One corner of a car: body on a spring and damper, wheel on a tire. Move the sliders and watch.</p>
+  </header>
+
+  <main>
+    <aside id="controls">
+      <section>
+        <h2>Model</h2>
+        <div id="model-kind" class="segmented"></div>
+      </section>
+      <section>
+        <h2>Road</h2>
+        <div id="road-kind" class="segmented"></div>
+        <div id="road-sliders"></div>
+      </section>
+      <section id="half-section" hidden>
+        <h2>Car shape and driving</h2>
+        <div id="half-sliders"></div>
+        <div class="presets">
+          <span>Try:</span>
+          <button data-brake="0.7">Hard braking</button>
+          <button data-brake="-0.4">Accelerating</button>
+          <button data-brake="0">No pedal</button>
+        </div>
+      </section>
+      <section>
+        <h2>Car</h2>
+        <div id="car-sliders"></div>
+      </section>
+      <section>
+        <h2>Spring</h2>
+        <div id="spring-sliders"></div>
+      </section>
+      <section>
+        <h2>Damper</h2>
+        <div id="damper-sliders"></div>
+        <div class="presets">
+          <span>Set damping ratio ζ:</span>
+          <button data-zeta="0.1">0.1</button>
+          <button data-zeta="0.3">0.3</button>
+          <button data-zeta="0.7">0.7</button>
+          <button data-zeta="1.0">1.0</button>
+        </div>
+      </section>
+    </aside>
+
+    <div id="view">
+      <section class="card">
+        <canvas id="scene" height="320"></canvas>
+        <div class="playbar">
+          <button id="play">Pause</button>
+          <label>Playback
+            <select id="playback">
+              <option value="1">1×</option>
+              <option value="0.5">0.5×</option>
+              <option value="0.25" selected>0.25×</option>
+              <option value="0.1">0.1×</option>
+            </select>
+          </label>
+          <label>Exaggerate motion
+            <select id="exaggerate">
+              <option value="1">1×</option>
+              <option value="2">2×</option>
+              <option value="3" selected>3×</option>
+              <option value="5">5×</option>
+            </select>
+          </label>
+          <span id="clock"></span>
+        </div>
+      </section>
+
+      <section id="readouts" class="readouts"></section>
+
+      <section class="card">
+        <h3>Motion</h3>
+        <div id="plot-motion" class="plot"></div>
+      </section>
+      <section class="card" id="card-pitch" hidden>
+        <h3>Pitch</h3>
+        <p class="note">Body rotation. Below zero the nose is down (braking, or the front hitting a bump first),
+          above zero the nose is up (accelerating).</p>
+        <div id="plot-pitch" class="plot"></div>
+      </section>
+      <section class="card">
+        <h3>Comfort and grip</h3>
+        <p class="note">Body acceleration is what you feel. Tire load is grip: at 0 % the wheel is in the air.</p>
+        <div id="plot-feel" class="plot"></div>
+      </section>
+      <section class="card">
+        <h3>Frequency response</h3>
+        <p class="note">How much of a road wave of each frequency reaches the body and the wheel.
+          Above 1 it is amplified, below 1 it is filtered out. Dashed lines: half and double damping.
+          <span id="freq-half-note" hidden>Half-car: the rear wheel meets each wave later (wheelbase ÷ speed).
+            When that delay is half a wave, the front and rear are pushed in opposite directions and the car pitches most:
+            the nose and tail curves then differ.</span></p>
+        <div id="plot-freq" class="plot"></div>
+      </section>
+
+      <section class="card explain">
+        <h3>How it works</h3>
+        <div class="explain-grid">
+          <div>
+            <h4>Spring: holds the car up</h4>
+            <p><code>F = k · x</code>. Stores energy as it compresses and gives it back.
+              On its own, a mass on a spring bounces forever at its natural frequency
+              <code>f = √(k/m) / 2π</code>. Cars sit around 1–1.5 Hz: lower feels floaty, higher feels harsh.</p>
+          </div>
+          <div>
+            <h4>Damper: kills the bounce</h4>
+            <p><code>F = c · v</code>. Turns motion into heat by forcing oil through small holes.
+              It only reacts to <em>speed</em>, not position, so it doesn't change ride height.</p>
+          </div>
+          <div>
+            <h4>Damping ratio ζ</h4>
+            <p><code>ζ = c / (2√(k·m))</code>. ζ &lt; 1: overshoots and oscillates.
+              ζ = 1 (critical): fastest return without overshoot. ζ &gt; 1: slow, sluggish.
+              Road cars use ζ ≈ 0.2–0.4, race cars ≈ 0.5–0.8.</p>
+          </div>
+          <div>
+            <h4>Two resonances</h4>
+            <p>The body bounces at ~1–1.5 Hz on the soft spring.
+              The light wheel "hops" at ~10–15 Hz between spring and stiff tire.
+              Between the two the suspension isolates you best.</p>
+          </div>
+          <div>
+            <h4>Comfort vs grip</h4>
+            <p>More damping controls both peaks, but above the body resonance it pushes more road
+              through to the body. Less damping is smoother there, but the body and wheel move a lot,
+              and tire load swings, so grip suffers. Every setup is a compromise.</p>
+          </div>
+          <div>
+            <h4>Compression vs rebound</h4>
+            <p>Dampers are usually softer in compression (let the wheel ride up over a bump)
+              and firmer in rebound (stop the spring throwing the body back up).
+              Try a pothole with very high rebound: the wheel can't drop in fast enough.</p>
+          </div>
+          <div>
+            <h4>Unsprung mass</h4>
+            <p>A heavy wheel has more inertia: it follows bumps less well and loses grip sooner.
+              That's why light wheels and inboard brakes help handling.</p>
+          </div>
+          <div>
+            <h4>Pitch: dive and squat</h4>
+            <p>Half-car model. Braking pushes the car forward at its centre of gravity, which sits above the axles,
+              so the nose dips. The extra load on the front springs is the <em>weight transfer</em>
+              <code>ΔF = m·a·h / L</code>: higher CG or shorter wheelbase means more of it.</p>
+          </div>
+          <div>
+            <h4>Wheelbase delay</h4>
+            <p>The rear wheel hits each bump <code>L / speed</code> after the front. Short bumps at the wrong speed
+              make the front and rear push opposite ways, which rocks the car instead of lifting it.</p>
+          </div>
+          <div>
+            <h4>Progressive spring</h4>
+            <p>Gets stiffer the more it compresses: soft over small bumps, firm near the end of travel.
+              The frequency plot uses the linear (small-motion) spring only.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
