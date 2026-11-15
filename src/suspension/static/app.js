@@ -161,6 +161,7 @@ function refreshModel() {
     b.classList.toggle("active", b.dataset.model === state.model)
   );
   $("half-section").hidden = state.model !== "half";
+  if (state.model === "half") $("half-section").open = true; // show the new controls
   inputs.body_mass.wrap.querySelector(".hint").textContent =
     state.model === "half"
       ? "A quarter of the body: this side view carries two of these. Heavier = lower bounce frequency."

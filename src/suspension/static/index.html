@@ -15,29 +15,15 @@
 
   <main>
     <aside id="controls">
-      <section>
-        <h2>Model</h2>
-        <div id="model-kind" class="segmented"></div>
-      </section>
-      <section>
-        <h2>Road</h2>
+      <div id="model-kind" class="segmented"></div>
+      <!-- One group is open at a time (same `name`), so the panel always fits on screen. -->
+      <details name="controls" open>
+        <summary>Road</summary>
         <div id="road-kind" class="segmented"></div>
         <div id="road-sliders"></div>
-      </section>
-      <section>
-        <h2>Controller (semi-active)</h2>
-        <div id="control-sliders"></div>
-        <p class="note">Skyhook: the damper adds force against the body's own motion, as if the body hung from
-          a hook in the sky. Dashed curves show the same car with a normal damper.</p>
-      </section>
-      <section>
-        <h2>Ride-height controller (PID)</h2>
-        <div id="pid-sliders"></div>
-        <p class="note">An actuator between body and wheel pushes the body back toward its starting height.
-          Add a load, then raise P, I and D one at a time and watch the dashed passive curve for comparison.</p>
-      </section>
-      <section id="half-section" hidden>
-        <h2>Car shape and driving</h2>
+      </details>
+      <details name="controls" id="half-section" hidden>
+        <summary>Car shape and driving</summary>
         <div id="half-sliders"></div>
         <div class="presets">
           <span>Try:</span>
@@ -45,17 +31,17 @@
           <button data-brake="-0.4">Accelerating</button>
           <button data-brake="0">No pedal</button>
         </div>
-      </section>
-      <section>
-        <h2>Car</h2>
+      </details>
+      <details name="controls">
+        <summary>Masses</summary>
         <div id="car-sliders"></div>
-      </section>
-      <section>
-        <h2>Spring</h2>
+      </details>
+      <details name="controls">
+        <summary>Spring and tire</summary>
         <div id="spring-sliders"></div>
-      </section>
-      <section>
-        <h2>Damper</h2>
+      </details>
+      <details name="controls">
+        <summary>Damper</summary>
         <div id="damper-sliders"></div>
         <div class="presets">
           <span>Set damping ratio ζ:</span>
@@ -64,7 +50,19 @@
           <button data-zeta="0.7">0.7</button>
           <button data-zeta="1.0">1.0</button>
         </div>
-      </section>
+      </details>
+      <details name="controls">
+        <summary>Active: skyhook damper</summary>
+        <div id="control-sliders"></div>
+        <p class="note">Semi-active: the damper adds force against the body's own motion, as if the body hung from
+          a hook in the sky. Dashed curves show the same car with a normal damper.</p>
+      </details>
+      <details name="controls">
+        <summary>Active: ride-height PID</summary>
+        <div id="pid-sliders"></div>
+        <p class="note">An actuator between body and wheel pushes the body back toward its starting height.
+          Add a load, then raise P, I and D one at a time and watch the dashed passive curve for comparison.</p>
+      </details>
     </aside>
 
     <div id="view">

@@ -69,8 +69,9 @@ main {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 4px 16px 12px;
+  padding: 12px 16px 4px;
 }
+#controls > .segmented { margin-bottom: 8px; }
 
 #controls h2 {
   font-size: 12px;
@@ -80,12 +81,41 @@ main {
   margin: 16px 0 8px;
 }
 
-.slider { margin-bottom: 12px; }
+/* Accordion sections: one open at a time, so the panel always fits */
+#controls details { border-top: 1px solid var(--line); }
+#controls summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 8px 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+}
+#controls summary::-webkit-details-marker { display: none; }
+#controls summary::after { content: "▸"; }
+#controls details[open] > summary { color: var(--text); }
+#controls details[open] > summary::after { content: "▾"; }
+#controls details > :last-child { margin-bottom: 12px; }
+
+.slider { margin-bottom: 6px; }
 .slider .top { display: flex; justify-content: space-between; gap: 8px; }
 .slider label { font-weight: 600; }
 .slider .value { font-variant-numeric: tabular-nums; }
-.slider input[type=range] { width: 100%; accent-color: var(--accent); }
-.slider .hint { color: var(--muted); font-size: 12px; margin-top: 1px; }
+.slider input[type=range] { width: 100%; margin: 2px 0; accent-color: var(--accent); }
+/* The explanation appears while you hover or use the slider, so it doesn't take up room */
+.slider .hint {
+  color: var(--muted);
+  font-size: 12px;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height .15s, opacity .15s;
+}
+.slider:hover .hint, .slider:focus-within .hint { max-height: 6em; opacity: 1; }
 .slider.disabled { opacity: .4; }
 
 .segmented { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; }
