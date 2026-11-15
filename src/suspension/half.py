@@ -15,7 +15,17 @@ import numpy as np
 from scipy.integrate import solve_ivp
 from scipy.linalg import eigh
 
-from .physics import Car, G, characteristics, damper_force, spring_force, tire_force
+from .physics import (
+    LOAD_DURATION,
+    Car,
+    G,
+    actuator_force,
+    characteristics,
+    damper_force,
+    load_force,
+    spring_force,
+    tire_force,
+)
 from .road import Road
 
 BRAKE_START = 0.5  # s
@@ -35,6 +45,10 @@ def scaled(car: Car, w: float) -> Car:
         tire_rate=car.tire_rate * w,
         skyhook_gain=car.skyhook_gain * w,
         damping_max=car.damping_max * w,
+        pid_kp=car.pid_kp * w,
+        pid_ki=car.pid_ki * w,
+        pid_kd=car.pid_kd * w,
+        extra_load=car.extra_load * w,
     )
 
 
@@ -124,6 +138,8 @@ def simulate_half(half: HalfCar, road: Road, sample_rate: float = 200.0) -> dict
     duration = road.duration + L / road.speed
     if half.braking_g != 0:
         duration = max(duration, BRAKE_END + 2.5)
+    if half.car.extra_load > 0:
+        duration = max(duration, LOAD_DURATION)
     road_x = np.arange(0.0, road.speed * duration + 6.0, 0.01)
     road_z = road.height_at(road_x)
 
@@ -134,42 +150,49 @@ def simulate_half(half: HalfCar, road: Road, sample_rate: float = 200.0) -> dict
         return np.interp(road.speed * t - L, road_x, road_z)
 
     def forces(t, y):
-        z, vz, th, vth, zf, vf, zr, vr = y
+        z, vz, th, vth, zf, vf, zr, vr, int_f, int_r = y
         tf, tr = zf - (z + a * th), zr - (z - b * th)  # travel, + = compressed
         vtf, vtr = vf - (vz + a * vth), vr - (vz - b * vth)
         # force on body, + = up; the skyhook damper needs the body's own velocity at each mount
         Ff = spring_force(front, tf) + damper_force(front, vtf, vz + a * vth)
         Fr = spring_force(rear, tr) + damper_force(rear, vtr, vz - b * vth)
+        # each axle has its own ride-height controller, acting at its own mount
+        Af = actuator_force(front, z + a * th, vz + a * vth, int_f)
+        Ar = actuator_force(rear, z - b * th, vz - b * vth, int_r)
         Tf = tire_force(front, road_front(t) - zf)
         Tr = tire_force(rear, road_rear(t) - zr)
-        return Ff, Fr, Tf, Tr, tf, tr
+        return Ff, Fr, Af, Ar, Tf, Tr, tf, tr
 
     def derivatives(t, y):
-        Ff, Fr, Tf, Tr, _, _ = forces(t, y)
+        Ff, Fr, Af, Ar, Tf, Tr, _, _ = forces(t, y)
+        on_body_f = Ff + Af + load_force(front, t)  # everything pushing the body at each mount
+        on_body_r = Fr + Ar + load_force(rear, t)
         # Braking: the car's inertia pushes forward at the CG, above the axle line,
         # which tips the nose down (negative pitch moment).
         decel = half.braking_g * G * braking_profile(t)
-        pitch_moment = a * Ff - b * Fr - M * decel * h
+        pitch_moment = a * on_body_f - b * on_body_r - M * decel * h
         return [
             y[1],
-            (Ff + Fr) / M,
+            (on_body_f + on_body_r) / M,
             y[3],
             pitch_moment / inertia,
             y[5],
-            (Tf - Ff) / front.wheel_mass,
+            (Tf - Ff - Af) / front.wheel_mass,
             y[7],
-            (Tr - Fr) / rear.wheel_mass,
+            (Tr - Fr - Ar) / rear.wheel_mass,
+            y[0] + a * y[2],  # integral terms accumulate the height error at each mount
+            y[0] - b * y[2],
         ]
 
     t = np.arange(0.0, duration, 1.0 / sample_rate)
     sol = solve_ivp(
-        derivatives, (0.0, duration), np.zeros(8), t_eval=t, max_step=2e-3, rtol=1e-6, atol=1e-9
+        derivatives, (0.0, duration), np.zeros(10), t_eval=t, max_step=2e-3, rtol=1e-6, atol=1e-9
     )
-    z, vz, th, vth, zf, vf, zr, vr = sol.y
-    Ff, Fr, Tf, Tr, tf, tr = (np.empty_like(t) for _ in range(6))
+    z, vz, th, vth, zf, vf, zr, vr, _, _ = sol.y
+    Ff, Fr, Af, Ar, Tf, Tr, tf, tr = (np.empty_like(t) for _ in range(8))
     for i in range(t.size):
-        Ff[i], Fr[i], Tf[i], Tr[i], tf[i], tr[i] = forces(t[i], sol.y[:, i])
-    body_acc = (Ff + Fr) / M
+        Ff[i], Fr[i], Af[i], Ar[i], Tf[i], Tr[i], tf[i], tr[i] = forces(t[i], sol.y[:, i])
+    body_acc = (Ff + Fr + Af + Ar + load_force(front, t) + load_force(rear, t)) / M
     load_f = 100 * (front.static_tire_load + Tf) / front.static_tire_load
     load_r = 100 * (rear.static_tire_load + Tr) / rear.static_tire_load
     pitch_deg = np.degrees(th)
@@ -184,6 +207,8 @@ def simulate_half(half: HalfCar, road: Road, sample_rate: float = 200.0) -> dict
         "tire_load_min_pct": float(min(load_f.min(), load_r.min())),
         "airborne_pct": float(100 * np.mean((load_f <= 0) | (load_r <= 0))),
         "pitch_peak_deg": float(pitch_deg[np.argmax(np.abs(pitch_deg))]),
+        "final_height": float(z[t > t[-1] - 0.5].mean()),
+        "actuator_peak": float(np.max(np.abs(Af) + np.abs(Ar))),
     }
     return {
         "t": t,

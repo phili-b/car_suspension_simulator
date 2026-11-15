@@ -30,6 +30,12 @@
         <p class="note">Skyhook: the damper adds force against the body's own motion, as if the body hung from
           a hook in the sky. Dashed curves show the same car with a normal damper.</p>
       </section>
+      <section>
+        <h2>Ride-height controller (PID)</h2>
+        <div id="pid-sliders"></div>
+        <p class="note">An actuator between body and wheel pushes the body back toward its starting height.
+          Add a load, then raise P, I and D one at a time and watch the dashed passive curve for comparison.</p>
+      </section>
       <section id="half-section" hidden>
         <h2>Car shape and driving</h2>
         <div id="half-sliders"></div>
@@ -162,7 +168,8 @@
             <h4>Suspension as a controller</h4>
             <p>The spring is the <b>P</b> term (force ∝ position error) and the damper the <b>D</b> term
               (force ∝ speed): a passive suspension is a PD controller. There is no <b>I</b> term, which is why the
-              car sags under load; self-levelling air suspension adds it.</p>
+              car sags under load; self-levelling air suspension adds it. In the PID section, P alone only
+              shrinks the sag (a stiffer spring), I removes it, and too much I makes the car overshoot and wobble.</p>
           </div>
           <div>
             <h4>Skyhook (semi-active)</h4>

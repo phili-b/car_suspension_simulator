@@ -21,6 +21,9 @@ from .road import Road
 
 G = 9.81
 REF_TRAVEL = 0.05  # m, the travel at which `progression` is defined
+LOAD_TIME = 1.0  # s, when the extra load lands on the body
+LOAD_EDGE = 0.2  # s, it is lowered, not dropped
+LOAD_DURATION = 7.0  # s, long enough to watch the integral term finish its work
 
 
 @dataclass(frozen=True)
@@ -34,6 +37,14 @@ class Car:
     progression: float = 0.0  # extra stiffness at REF_TRAVEL: 1.0 = twice as stiff
     skyhook_gain: float = 0.0  # N*s/m, 0 = ordinary passive damper
     damping_max: float = 6_000.0  # N*s/m, hardest the semi-active damper can get
+    pid_kp: float = 0.0  # N/m, active ride-height controller: push back per metre of error
+    pid_ki: float = 0.0  # N/(m*s): ... per metre-second of accumulated error
+    pid_kd: float = 0.0  # N*s/m: ... per m/s of body speed
+    extra_load: float = 0.0  # kg dropped onto the body at LOAD_TIME (luggage, passengers)
+
+    @property
+    def has_controller(self) -> bool:
+        return self.skyhook_gain > 0 or self.pid_kp > 0 or self.pid_ki > 0 or self.pid_kd > 0
 
     @property
     def damping_min(self) -> float:
@@ -78,6 +89,23 @@ def damper_force(car: Car, travel_rate, body_velocity=0.0):
     return c * travel_rate
 
 
+def actuator_force(car: Car, height, velocity, integral):
+    """Active ride-height controller: a PID on the body's height above its set point (0).
+
+    The actuator sits between body and wheel, so it pushes the body up and the wheel down
+    with the same force. P pushes back in proportion to the error, D against the speed, and
+    I against the error accumulated so far: it keeps growing until the error is gone, which is
+    what removes the sag a spring alone leaves under a load.
+    """
+    return -(car.pid_kp * height + car.pid_ki * integral + car.pid_kd * velocity)
+
+
+def load_force(car: Car, t):
+    """Weight of the extra load on the body (+ = up, so it is negative), eased in at LOAD_TIME."""
+    u = np.clip((t - LOAD_TIME) / LOAD_EDGE, 0.0, 1.0)
+    return -car.extra_load * G * 0.5 * (1 - np.cos(np.pi * u))
+
+
 def tire_force(car: Car, deflection):
     """Change in tire load from static. The tire can push on the road but never pull:
     when the total load reaches zero the wheel leaves the ground."""
@@ -104,7 +132,7 @@ def characteristics(car: Car) -> dict:
 
 def simulate(car: Car, road: Road, sample_rate: float = 200.0) -> dict:
     """Drive over the road and return time signals plus summary metrics."""
-    duration = road.duration
+    duration = max(road.duration, LOAD_DURATION) if car.extra_load > 0 else road.duration
     # Sample the road once on a fine grid; the solver interpolates (fast and exact enough).
     road_x = np.arange(0.0, road.speed * duration + 6.0, 0.01)
     road_z = road.height_at(road_x)
@@ -113,22 +141,30 @@ def simulate(car: Car, road: Road, sample_rate: float = 200.0) -> dict:
         return np.interp(road.speed * t, road_x, road_z)
 
     def derivatives(t, y):
-        z_body, v_body, z_wheel, v_wheel = y
+        z_body, v_body, z_wheel, v_wheel, height_integral = y
         f_susp = spring_force(car, z_wheel - z_body) + damper_force(car, v_wheel - v_body, v_body)
+        f_act = actuator_force(car, z_body, v_body, height_integral)
         f_tire = tire_force(car, road_at(t) - z_wheel)
-        return [v_body, f_susp / car.body_mass, v_wheel, (f_tire - f_susp) / car.wheel_mass]
+        return [
+            v_body,
+            (f_susp + f_act + load_force(car, t)) / car.body_mass,
+            v_wheel,
+            (f_tire - f_susp - f_act) / car.wheel_mass,
+            z_body,  # the integral term accumulates the body's height error
+        ]
 
     t = np.arange(0.0, duration, 1.0 / sample_rate)
     sol = solve_ivp(
-        derivatives, (0.0, duration), [0, 0, 0, 0], t_eval=t, max_step=2e-3, rtol=1e-6, atol=1e-9
+        derivatives, (0.0, duration), np.zeros(5), t_eval=t, max_step=2e-3, rtol=1e-6, atol=1e-9
     )
-    z_body, v_body, z_wheel, v_wheel = sol.y
+    z_body, v_body, z_wheel, v_wheel, height_integral = sol.y
     z_road = road_at(t)
     travel = z_wheel - z_body
     travel_rate = v_wheel - v_body
     f_susp = spring_force(car, travel) + damper_force(car, travel_rate, v_body)
+    f_act = actuator_force(car, z_body, v_body, height_integral)
     f_tire = tire_force(car, z_road - z_wheel)
-    body_acc = f_susp / car.body_mass
+    body_acc = (f_susp + f_act + load_force(car, t)) / car.body_mass
     tire_load_pct = 100 * (car.static_tire_load + f_tire) / car.static_tire_load
 
     metrics = {
@@ -139,6 +175,8 @@ def simulate(car: Car, road: Road, sample_rate: float = 200.0) -> dict:
         "tire_load_min_pct": float(tire_load_pct.min()),
         "tire_load_rms_pct": float(np.sqrt(np.mean((tire_load_pct - 100) ** 2))),
         "airborne_pct": float(100 * np.mean(tire_load_pct <= 0)),
+        "final_height": float(z_body[t > t[-1] - 0.5].mean()),
+        "actuator_peak": float(np.max(np.abs(f_act))),
     }
     return {
         "t": t,

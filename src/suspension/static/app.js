@@ -30,6 +30,14 @@ const SLIDERS = [
     hint: "0 = ordinary damper. Above 0 the damper is soft, then stiffens only when that calms the body." },
   { group: "control", key: "damping_max", label: "Hardest damper setting", min: 2, max: 12, step: 0.5, value: 6, unit: "kN·s/m", si: 1000,
     hint: "The controller can't go harder than this. Softest = the lower of your two damping settings above." },
+  { group: "pid", key: "extra_load", label: "Load added at t = 1 s", min: 0, max: 300, step: 10, value: 0, unit: "kg", si: 1,
+    hint: "Luggage or passengers lowered onto the body. A spring alone just sags under it." },
+  { group: "pid", key: "pid_kp", label: "P: Kp", min: 0, max: 80, step: 1, value: 0, unit: "kN/m", si: 1000,
+    hint: "Pushes back in proportion to how far the body is from ride height (like a stiffer spring)." },
+  { group: "pid", key: "pid_ki", label: "I: Ki", min: 0, max: 200, step: 5, value: 0, unit: "kN/(m·s)", si: 1000,
+    hint: "Pushes harder the longer the error lasts. This is what finally removes the sag." },
+  { group: "pid", key: "pid_kd", label: "D: Kd", min: 0, max: 10, step: 0.5, value: 0, unit: "kN·s/m", si: 1000,
+    hint: "Pushes against the body's speed: calms oscillation, like an extra damper on the sky." },
   // half-car only
   { group: "half", key: "braking_g", label: "Braking (+) / accelerating (−)", min: -0.5, max: 1, step: 0.05, value: 0, unit: "g", si: 1,
     hint: "Pedal pressed from 0.5 s to 2.5 s. Braking tips the nose down (dive), accelerating the tail down (squat)." },
@@ -44,7 +52,7 @@ const SLIDERS = [
 ];
 
 const ROADS = [
-  { kind: "flat", label: "Smooth", halfOnly: true },
+  { kind: "flat", label: "Smooth" },
   { kind: "step", label: "Curb" },
   { kind: "bump", label: "Bump" },
   { kind: "pothole", label: "Pothole" },
@@ -142,7 +150,6 @@ function setRoad(kind) {
 
 function setModel(model) {
   state.model = model;
-  if (model === "quarter" && state.roadKind === "flat") state.roadKind = "bump";
   simT = 0;
   refreshModel();
   refreshRoadButtons();
@@ -161,11 +168,9 @@ function refreshModel() {
 }
 
 function refreshRoadButtons() {
-  document.querySelectorAll("#road-kind button").forEach((b) => {
-    const road = ROADS.find((r) => r.kind === b.dataset.kind);
-    b.hidden = road.halfOnly && state.model !== "half";
-    b.classList.toggle("active", b.dataset.kind === state.roadKind);
-  });
+  document.querySelectorAll("#road-kind button").forEach((b) =>
+    b.classList.toggle("active", b.dataset.kind === state.roadKind)
+  );
   for (const { wrap, spec } of Object.values(inputs)) {
     wrap.classList.toggle("disabled", spec.only !== undefined && spec.only !== state.roadKind);
   }
@@ -215,6 +220,8 @@ async function runSimulation() {
     sim = await res.json();
     sim.speed = body.road.speed;
     sim.brakingG = body.half.braking_g;
+    sim.extraLoad = body.car.extra_load;
+    sim.pidOn = body.car.pid_kp > 0 || body.car.pid_ki > 0 || body.car.pid_kd > 0;
     sim.duration = sim.time.t[sim.time.t.length - 1];
     if (simT > sim.duration) simT = 0;
     renderReadouts();
@@ -263,6 +270,15 @@ function renderReadouts() {
         ["Travel used", `${cm(m.max_compression)} / ${cm(m.max_extension)} cm`, "compression / extension"],
         sag,
       ];
+  if (sim.extraLoad > 0 || sim.pidOn) {
+    const level = Math.abs(m.final_height) < 0.005; // within 5 mm of where it started
+    const sign = Math.abs(m.final_height) < 0.0005 ? "" : m.final_height > 0 ? "+" : "−";
+    cards.push(["Body height at end", `${sign}${cm(Math.abs(m.final_height))} cm`,
+      b ? `vs. start · passive ${cm(b.metrics.final_height)} cm` : "vs. start", level ? "good" : "bad"]);
+  }
+  if (sim.pidOn) {
+    cards.push(["Actuator force", `${(m.actuator_peak / 1000).toFixed(1)} kN`, "peak (an active system burns energy)"]);
+  }
   $("readouts").innerHTML = cards
     .map(([name, num, sub, cls = ""]) =>
       `<div class="readout ${cls}"><div class="name">${name}</div><div class="num">${num}</div><div class="sub">${sub}</div></div>`)
@@ -703,6 +719,12 @@ function draw() {
   if (!sim) return;
   if (sim.model === "half") drawHalf(W);
   else drawQuarter(W);
+  if (sim.extraLoad > 0 && simT > 1) {
+    ctx.textAlign = "left";
+    ctx.font = "600 13px system-ui, sans-serif";
+    ctx.fillStyle = css("--text");
+    ctx.fillText(`+${sim.extraLoad} kg on the body`, 14, H - 14);
+  }
   $("clock").textContent = `t = ${simT.toFixed(2)} s / ${sim.duration.toFixed(1)} s`;
 }
 

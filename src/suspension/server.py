@@ -28,6 +28,10 @@ class CarIn(BaseModel):
     progression: float = Field(0.0, ge=0)
     skyhook_gain: float = Field(0.0, ge=0)
     damping_max: float = Field(6_000.0, gt=0)
+    pid_kp: float = Field(0.0, ge=0)
+    pid_ki: float = Field(0.0, ge=0)
+    pid_kd: float = Field(0.0, ge=0)
+    extra_load: float = Field(0.0, ge=0)
 
 
 class RoadIn(BaseModel):
@@ -70,7 +74,8 @@ def api_simulate(req: SimulateRequest) -> dict:
     car = Car(**req.car.model_dump())
     road = Road(**req.road.model_dump())
     freq = np.logspace(np.log10(0.2), np.log10(40), 400)
-    passive = replace(car, skyhook_gain=0.0)  # same car with the controller switched off
+    # same car (and same extra load) with every controller switched off
+    passive = replace(car, skyhook_gain=0.0, pid_kp=0.0, pid_ki=0.0, pid_kd=0.0)
     if req.model == "half":
         half = HalfCar(car=car, **req.half.model_dump())
         result = {
@@ -86,8 +91,8 @@ def api_simulate(req: SimulateRequest) -> dict:
             "frequency": frequency_response(car, freq),
         }
         baseline = lambda: simulate(passive, road)  # noqa: E731
-    if car.skyhook_gain > 0:
-        # Passive comparison: same springs and dampers settings, no controller.
+    if car.has_controller:
+        # Passive comparison: same springs and damper settings, no controller.
         base = baseline()
         result["baseline"] = {k: base[k] for k in ("z_body", "body_acc", "metrics")}
         if req.model == "half":
