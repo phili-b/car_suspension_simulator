@@ -1,0 +1,19 @@
+services:
+  car-suspension:
+    build: .
+    image: car-suspension
+    container_name: car-suspension
+    restart: unless-stopped
+    ports:
+      - "8000:8000" # Nginx Proxy Manager: forward to <nuc-ip>:8000, or see the network option below
+
+    # Alternative: no published port. Join Nginx Proxy Manager's Docker network and forward to
+    # http://car-suspension:8000 instead. Find the network name with `docker network ls`.
+    # Then delete the `ports:` lines above and uncomment:
+    # networks:
+    #   - proxy
+    #
+# networks:
+#   proxy:
+#     external: true
+#     name: npm_default

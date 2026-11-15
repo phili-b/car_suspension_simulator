@@ -31,6 +31,17 @@ uv run suspension
 
 That opens http://127.0.0.1:8000. Other options: `--port 8100`, `--no-browser`.
 
+## 🐳 Deploy with Docker
+
+```
+docker compose up -d --build     # builds the image and starts it on port 8000
+```
+
+Then point Nginx Proxy Manager at `<host>:8000` (a Proxy Host, scheme `http`). To keep the port
+unpublished, join NPM's Docker network instead: see the comments in `docker-compose.yml`.
+Update with `git pull && docker compose up -d --build`. The app has no login, so add an NPM access list
+if it is reachable from outside your network.
+
 ## 🧪 Things to try
 
 1. **Bounce at the wrong frequency.** Pick *Waves* and sweep the wavelength until the body wobbles wildly: that is resonance. Raise the damping and watch the peak shrink.
@@ -89,4 +100,5 @@ braking dives the nose, a tiny wheelbase reduces to two quarter-cars, and the in
 - The model is 2D and linear in the small, with a few honest nonlinearities (asymmetric damper,
   progressive spring, tire lift-off). It ignores roll, anti-dive geometry and tire slip.
 - The active controllers are ideal: no actuator delay or force limit.
-- The server has no login and listens on localhost only. Put authentication in front of it before sharing it.
+- The server has no login. Locally it listens on localhost only (`--host 0.0.0.0` opens it up, which the
+  Docker image does). Put authentication in front of it before exposing it.

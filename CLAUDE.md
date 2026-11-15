@@ -45,13 +45,15 @@ Python changes need a server restart. Files in `src/suspension/static/` are serv
 - The git repository root is the home directory (`C:\Users\P.Baetens`), not this folder. Stage and commit
   with a pathspec limited to this folder (`git add -- .` and `git commit -- .` from here) so nothing else is swept in.
 - No Claude co-author or "Generated with" lines in commits or PRs.
-- GitHub: https://github.com/phili-b/car_suspesion_simulator (the repo name is spelled that way).
+- GitHub: https://github.com/phili-b/car_suspension_simulator (renamed from `car_suspesion_simulator`).
   To publish only this folder's history from the home-directory repo:
   `git subtree split --prefix=Code/car_suspension -b tmp-split`, then
-  `git push git@github.com:phili-b/car_suspesion_simulator.git tmp-split:main`, then delete `tmp-split`.
+  `git push git@github.com:phili-b/car_suspension_simulator.git tmp-split:main`, then delete `tmp-split`.
   Pushing needs the user's go-ahead each time.
 
 ## Deployment
 
-Planned: Docker container behind Nginx Proxy Manager on an Intel NUC. The server currently binds `127.0.0.1`
-only and has no authentication.
+Docker container behind Nginx Proxy Manager on an Intel NUC (`Dockerfile`, `docker-compose.yml`).
+The image runs `suspension --host 0.0.0.0 --no-browser` on port 8000 as a non-root user.
+The Docker files were written without Docker available locally, so they have not been built here: if
+a build fails, fix the Dockerfile rather than the app. The app has no authentication: use an NPM access list.
