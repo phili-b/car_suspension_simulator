@@ -297,7 +297,7 @@ function layout(extra) {
     paper_bgcolor: "rgba(0,0,0,0)",
     plot_bgcolor: "rgba(0,0,0,0)",
     font: { color: css("--text"), size: 12, family: "system-ui, sans-serif" },
-    margin: { l: 55, r: 55, t: 10, b: 40 },
+    margin: { l: innerWidth < 600 ? 48 : 55, r: innerWidth < 600 ? 48 : 55, t: 10, b: 40 },
     legend: { orientation: "h", y: 1.15, x: 0 },
     hovermode: "x unified",
     ...extra,
@@ -449,7 +449,7 @@ let lastFrame = null;
 
 const canvas = $("scene");
 const ctx = canvas.getContext("2d");
-const H = 320;
+let H = 320; // canvas height in px: shorter on phones so it can stay pinned above the controls
 const WHEEL_R = 0.32; // m
 const STATIC_LENGTH = 0.45; // m, hub to body at ride height
 const BODY_H = 0.3; // m
@@ -564,7 +564,7 @@ function drawCorner(x, hubY, bodyY, rate, ppm, angle, rim, labels) {
 }
 
 function drawGauge(gx, load, label) {
-  const gTop = 30, gH = 200;
+  const gTop = 30, gH = H - 120;
   const frac = Math.min(Math.max(load, 0), 200) / 200;
   ctx.fillStyle = css("--line");
   ctx.fillRect(gx, gTop, 14, gH);
@@ -593,7 +593,8 @@ function airborneWarning(W, cx) {
 function setupCanvas() {
   const dpr = window.devicePixelRatio || 1;
   const W = canvas.clientWidth;
-  if (canvas.width !== Math.round(W * dpr)) {
+  H = W < 560 ? 200 : 320;
+  if (canvas.width !== Math.round(W * dpr) || canvas.height !== Math.round(H * dpr)) {
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
   }

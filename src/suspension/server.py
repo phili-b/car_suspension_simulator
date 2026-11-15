@@ -69,6 +69,16 @@ def _jsonable(value):
 app = FastAPI(title="Car suspension explorer")
 
 
+@app.middleware("http")
+async def revalidate_static_files(request, call_next):
+    """Browsers must check for a newer page/script/style on every load (cheap: 304 if unchanged),
+    otherwise an update can be hidden behind a cached copy."""
+    response = await call_next(request)
+    if not request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 @app.post("/api/simulate")
 def api_simulate(req: SimulateRequest) -> dict:
     car = Car(**req.car.model_dump())
