@@ -53,6 +53,8 @@ Python changes need a server restart. Files in `src/suspension/static/` are serv
 
 ## Deployment
 
+Step-by-step instructions (Docker, and without Docker via a systemd service) are in `DEPLOY.md`: keep them
+in step with the `Dockerfile`, `docker-compose.yml` and the CLI options.
 Docker container behind Nginx Proxy Manager on an Intel NUC (`Dockerfile`, `docker-compose.yml`).
 The image runs `suspension --host 0.0.0.0 --no-browser` on port 8000 as a non-root user.
 The Docker files were written without Docker available locally, so they have not been built here: if

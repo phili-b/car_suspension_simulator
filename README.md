@@ -37,10 +37,11 @@ That opens http://127.0.0.1:8000. Other options: `--port 8100`, `--no-browser`.
 docker compose up -d --build     # builds the image and starts it on port 8000
 ```
 
-Then point Nginx Proxy Manager at `<host>:8000` (a Proxy Host, scheme `http`). To keep the port
-unpublished, join NPM's Docker network instead: see the comments in `docker-compose.yml`.
-Update with `git pull && docker compose up -d --build`. The app has no login, so add an NPM access list
-if it is reachable from outside your network.
+Then point Nginx Proxy Manager at `<host>:8000` (a Proxy Host, scheme `http`). The app has no login,
+so add an NPM access list if it is reachable from outside your network.
+
+Step-by-step instructions, with Docker **and** without it (a folder plus a systemd service),
+including the Nginx Proxy Manager settings and troubleshooting, are in [DEPLOY.md](DEPLOY.md).
 
 ## 🧪 Things to try
 
