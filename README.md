@@ -9,6 +9,7 @@ and a soft one feels floaty.
 Python does the physics (real differential equations, not a cartoon). The browser draws it.
 
 ---
+<img width="1592" height="889" alt="image" src="https://github.com/user-attachments/assets/eeb79188-74fa-4611-88fe-8ec022f3c2b3" />
 
 ## ✨ What you can play with
 
